@@ -1,6 +1,15 @@
 package main
 
+import "fmt"
+
+
 func main() {
-	print("Hello world!")
+	depots, customers, err := LoadProblem("problems/p01")
+	if err != nil {
+		panic(err)
+	}
+	
+	fmt.Println(customers)
+	fmt.Println(depots)
 }
 
