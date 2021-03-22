@@ -1,13 +1,16 @@
 package entities
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+	"reflect"
+)
 
 type Customer struct {
-	ID int
-	X float64
-	Y float64
+	X, Y            float64
+	ID              int
 	ServiceDuration float64
-	Demand float64
+	Demand          float64
 }
 
 func (c *Customer) String() string {
@@ -19,7 +22,17 @@ func (c *Customer) String() string {
 )`, c.ID, c.X, c.Y, c.ServiceDuration, c.Demand)
 }
 
-type Customers []*Customer
+func (c *Customer) GetPosition() (X, Y float64) {
+	return c.X, c.Y
+}
+
+type Customers map[int]*Customer
+
+func (cs Customers) RandomSelect() (k int, v *Customer) {
+	mapKeys := reflect.ValueOf(cs).MapKeys()
+	selectedKey := mapKeys[rand.Intn(len(mapKeys))].Interface().(int)
+	return selectedKey, cs[selectedKey]
+}
 
 func (cs Customers) String() string {
 	text := ""

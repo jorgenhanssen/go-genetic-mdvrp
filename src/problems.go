@@ -6,26 +6,29 @@ import (
 	"math"
 	"os"
 
-	entities "github.com/jorgenhanssen/go-genetic-mdvrp/src/entities"
+	"github.com/jorgenhanssen/go-genetic-mdvrp/src/entities"
 )
 
 func LoadProblem(filePath string) (depots entities.Depots, customers entities.Customers, err error) {
+	depots = make(entities.Depots)
+	customers = make(entities.Customers)
+
 	file, err := os.Open(filePath)
-    if err != nil {
-        return
-    }
-    defer file.Close()
+	if err != nil {
+		return
+	}
+	defer file.Close()
 
 	maxNumVehiclesPerDepot := math.MaxInt32
 	numCustomers := math.MaxInt32
 	numDepots := math.MaxInt32
 
 	scanner := bufio.NewScanner(file)
-    for line := 0; scanner.Scan(); line++ {
+	for line := 0; scanner.Scan(); line++ {
 		text := scanner.Text()
-		
+
 		// This is read last
-		if line > numDepots + numCustomers {
+		if line > numDepots+numCustomers {
 			depotIndex := line - (numDepots + numCustomers) - 1
 			depot := depots[depotIndex]
 
@@ -38,7 +41,7 @@ func LoadProblem(filePath string) (depots entities.Depots, customers entities.Cu
 
 		if line > numDepots {
 			customer := entities.Customer{}
-			if _, err = fmt.Sscanf(text, "%d %f %f %f %f", 
+			if _, err = fmt.Sscanf(text, "%d %f %f %f %f",
 				&customer.ID,
 				&customer.X,
 				&customer.Y,
@@ -47,7 +50,8 @@ func LoadProblem(filePath string) (depots entities.Depots, customers entities.Cu
 			); err != nil {
 				return
 			}
-			customers = append(customers, &customer)
+			customers[customer.ID] = &customer
+			// customers = append(customers, &customer)
 			continue
 		}
 
@@ -58,7 +62,8 @@ func LoadProblem(filePath string) (depots entities.Depots, customers entities.Cu
 			if _, err = fmt.Sscanf(text, "%f %f", &depot.MaxRouteDuration, &depot.MaxVehicleLoad); err != nil {
 				return
 			}
-			depots = append(depots, depot)
+			depots[len(depots)] = depot
+			// depots = append(depots, depot)
 			continue
 		}
 
@@ -66,11 +71,11 @@ func LoadProblem(filePath string) (depots entities.Depots, customers entities.Cu
 		if _, err = fmt.Sscanf(text, "%d %d %d", &maxNumVehiclesPerDepot, &numCustomers, &numDepots); err != nil {
 			return
 		}
-    }
+	}
 
-    if err = scanner.Err(); err != nil {
-        return
-    }
+	if err = scanner.Err(); err != nil {
+		return
+	}
 
 	return depots, customers, nil
 }

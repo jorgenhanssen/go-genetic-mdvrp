@@ -1,13 +1,16 @@
 package entities
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+	"reflect"
+)
 
 type Depot struct {
-	MaxNumVehicles int
+	X, Y             float64
+	MaxNumVehicles   int
 	MaxRouteDuration float64
-	MaxVehicleLoad float64
-	X float64
-	Y float64
+	MaxVehicleLoad   float64
 }
 
 func (d *Depot) String() string {
@@ -19,7 +22,17 @@ func (d *Depot) String() string {
 )`, d.X, d.Y, d.MaxNumVehicles, d.MaxRouteDuration, d.MaxVehicleLoad)
 }
 
-type Depots []*Depot
+func (d *Depot) GetPosition() (X, Y float64) {
+	return d.X, d.Y
+}
+
+type Depots map[int]*Depot
+
+func (ds Depots) RandomSelect() (k int, v *Depot) {
+	mapKeys := reflect.ValueOf(ds).MapKeys()
+	selectedKey := mapKeys[rand.Intn(len(mapKeys))].Interface().(int)
+	return selectedKey, ds[selectedKey]
+}
 
 func (ds Depots) String() string {
 	text := ""
