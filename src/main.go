@@ -32,6 +32,7 @@ func solveProblem(path string, gui *visualizer.Instance) {
 		SelectionSize:   0.5,
 		SelectionMethod: solver.Roulette,
 
+		// 1/n chances:
 		RandomChanceRouteSplit:              20,
 		RandomChanceDepotRelocation:         50,
 		RandomChanceEvaluateOuterDepotRoute: 100000,
