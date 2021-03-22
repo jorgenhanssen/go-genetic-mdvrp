@@ -10,22 +10,37 @@ import (
 type DNA []*Route
 
 func NewDNA(depots entities.Depots, customers entities.Customers) (dna DNA) {
-	for i, depot := range depots {
-		for j := 0; j < depot.MaxNumVehicles; j++ {
-			dna = append(dna, &Route{DepotID: i})
+	depotCustomers := make(map[int]entities.Customers)
+	for depotID := range depots {
+		depotCustomers[depotID] = make(entities.Customers)
+	}
+	for cID, customer := range customers {
+		closestDepotID := 0
+		closestDepotDistance := 999999999.0
+		for dID, depot := range depots {
+			dist := distance(depot, customer)
+			if dist < closestDepotDistance {
+				closestDepotDistance = dist
+				closestDepotID = dID
+			}
 		}
+		depotCustomers[closestDepotID][cID] = customer
 	}
 
-	remainingCustomers := make(entities.Customers)
-	for k, v := range customers {
-		remainingCustomers[k] = v
-	}
+	for depotID, remainingCustomers := range depotCustomers {
+		depotRoutes := []*Route{}
+		for j := 0; j < depots[depotID].MaxNumVehicles; j++ {
+			depotRoutes = append(depotRoutes, &Route{DepotID: depotID})
+		}
 
-	for i := 0; len(remainingCustomers) != 0; i = (i + 1) % len(dna) {
-		cID, customer := remainingCustomers.RandomSelect()
-		delete(remainingCustomers, cID)
-		nucleotide := dna[i]
-		nucleotide.Path = append(nucleotide.Path, customer.ID)
+		for i := 0; len(remainingCustomers) != 0; i = (i + 1) % len(depotRoutes) {
+			cID, customer := remainingCustomers.RandomSelect()
+			delete(remainingCustomers, cID)
+			nucleotide := depotRoutes[i]
+			nucleotide.Path = append(nucleotide.Path, customer.ID)
+		}
+
+		dna = append(dna, depotRoutes...)
 	}
 
 	return
@@ -59,35 +74,6 @@ func (dna DNA) RemoveRouteNodes(route *Route) {
 			}
 		}
 	}
-}
-
-func (dna DNA) depotIsAvailable(s *Solver, id int) bool {
-	max := s.Depots[id].MaxNumVehicles
-
-	numOccurences := 1 // if we add a new one
-	for _, route := range dna {
-		if route.DepotID == id {
-			numOccurences++
-			if numOccurences > max {
-				return false
-			}
-		}
-	}
-
-	return true
-}
-
-func (dna DNA) availableDepot(s *Solver, biasID int) (int, error) {
-	if dna.depotIsAvailable(s, biasID) {
-		return biasID, nil
-	}
-	for i := range s.Depots {
-		if i != biasID && dna.depotIsAvailable(s, i) {
-			return i, nil
-		}
-	}
-
-	return 0, fmt.Errorf("No available depots")
 }
 
 type Route struct {

@@ -1,6 +1,7 @@
 package solver
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 
@@ -17,6 +18,16 @@ type Fitness struct {
 func (f *Fitness) CalculateTotal() {
 	f.Total = f.Distance
 	f.Total += 100 * math.Pow(f.OverDemand, 2)
+}
+
+func (f *Fitness) Add(f2 *Fitness) {
+	f.Distance += f2.Distance
+	f.OverDemand += f2.OverDemand
+	f.CalculateTotal()
+}
+
+func (f Fitness) String() string {
+	return fmt.Sprintf("Fitness(dist: %f, over-demand: %f, total: %f)", f.Distance, f.OverDemand, f.Total)
 }
 
 type Agent struct {
@@ -89,9 +100,9 @@ func (agent *Agent) InjectRoute(injectedRoute *Route, s *Solver) {
 		bestI := 0
 
 		for _, route := range agent.Dna {
-			// if route.DepotID != injectedRoute.DepotID {
-			// 	continue
-			// }
+			if route.DepotID != injectedRoute.DepotID && rand.Intn(s.RandomChanceEvaluateOuterDepotRoute) != 0 {
+				continue
+			}
 			for i := 0; i < len(route.Path); i++ {
 				route.Path = append(route.Path[:i+1], route.Path[i:]...)
 				route.Path[i] = cID
@@ -121,30 +132,9 @@ func (agent *Agent) RandomMutation(s *Solver) {
 			continue
 		}
 
-		// 1/100 chance of re-locating closest depot
-		if rand.Intn(50) == 1 {
-			lowestDist := 999999999999.0
-			lowestDepotID := 0
-			for i, depot := range s.Depots {
-				dist := 0.0
-				for _, cID := range route.Path {
-					dist += distance(depot, s.Customers[cID])
-					// vote[route.DepotID] += distance(depot, s.Customers[cID])
-				}
-				if dist < lowestDist {
-					lowestDist = dist
-					lowestDepotID = i
-				}
-			}
-			if agent.Dna.depotIsAvailable(s, lowestDepotID) {
-				route.DepotID = lowestDepotID
-			}
-		}
-
-		if rand.Intn(20) == 1 {
-			// splitPoint := rand.Intn(len(route.Path))
-
-			availableDepotID, err := agent.Dna.availableDepot(s, route.DepotID)
+		hasBeenSplit := false
+		if rand.Intn(s.RandomChanceRouteSplit) == 0 {
+			availableDepotID, err := agent.availableDepot(s, route.DepotID)
 			if err != nil {
 				continue
 			}
@@ -156,9 +146,70 @@ func (agent *Agent) RandomMutation(s *Solver) {
 			}
 			route.Path = route.Path[splitPoint:]
 			agent.Dna = append(agent.Dna, &splitRoute)
-			// return
+
+			hasBeenSplit = true
+		}
+
+		// We want to relocate a split route's closest depot
+		// 1/100 chance of re-locating closest depot
+		if hasBeenSplit || rand.Intn(s.RandomChanceDepotRelocation) == 1 {
+			m := map[int]float64{}
+			for i, depot := range s.Depots {
+				if i == route.DepotID {
+					continue
+				}
+				m[i] = 0
+				for _, cID := range route.Path {
+					m[i] += distance(depot, s.Customers[cID])
+				}
+			}
+
+			for len(m) > 0 {
+				lowestVal := 9999999999.0
+				lowestKey := -1
+				for k, v := range m {
+					if v < lowestVal {
+						lowestKey = k
+					}
+				}
+				if agent.depotIsAvailable(s, lowestKey) {
+					route.DepotID = lowestKey
+					break
+				}
+
+				delete(m, lowestKey)
+			}
 		}
 	}
+}
+
+func (agent *Agent) depotIsAvailable(s *Solver, id int) bool {
+	max := s.Depots[id].MaxNumVehicles
+
+	numOccurences := 1 // if we add a new one
+	for _, route := range agent.Dna {
+		if route.DepotID == id {
+			numOccurences++
+			if numOccurences > max {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func (agent *Agent) availableDepot(s *Solver, biasID int) (int, error) {
+	if agent.depotIsAvailable(s, biasID) {
+		return biasID, nil
+	}
+	for i := range s.Depots {
+		if i != biasID && agent.depotIsAvailable(s, i) {
+			return i, nil
+		}
+	}
+
+	return 0, fmt.Errorf("No available depots")
 }
 
 type Agents []*Agent
@@ -174,12 +225,6 @@ func (agents Agents) SelectOne(method Selector) (int, *Agent) {
 	switch method {
 	case Roulette:
 		{
-			// index := rand.Intn(len(agents))
-			// return index, agents[index]
-
-			// index := rand.Intn(len(agents))
-			// return index, agents[index]
-			// calculate the total weights
 			sum := 0.0
 			highest := 0.0
 			for _, agent := range agents {

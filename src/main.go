@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 
 	"github.com/jorgenhanssen/go-genetic-mdvrp/src/solver"
 	"github.com/jorgenhanssen/go-genetic-mdvrp/src/visualizer"
@@ -14,55 +13,39 @@ func main() {
 		panic(err)
 	}
 
-	go solveProblemsInFolder("problems", gui)
+	go solveProblem("problems/p23", gui)
 
 	gui.Run()
 }
 
-func solveProblemsInFolder(problemDirPath string, gui *visualizer.Instance) {
-	files, err := ioutil.ReadDir(problemDirPath)
+func solveProblem(path string, gui *visualizer.Instance) {
+	depots, customers, err := LoadProblem(path)
 	if err != nil {
 		panic(err)
 	}
 
-	for i, file := range files {
-		if i+1 < 23 {
-			continue
-		}
-		if file.IsDir() {
-			continue
-		}
+	slvr, err := solver.NewSolver(solver.SolverConfig{
+		Depots:    depots,
+		Customers: customers,
 
-		fmt.Printf("Solving %s\n", file.Name())
-		depots, customers, err := LoadProblem(fmt.Sprintf("%s/%s", problemDirPath, file.Name()))
-		if err != nil {
-			panic(err)
-		}
+		PopulationSize:  128,
+		SelectionSize:   0.5,
+		SelectionMethod: solver.Roulette,
 
-		slvr, err := solver.NewSolver(solver.SolverConfig{
-			PopulationSize: 256,
-			Depots:         depots,
-			Customers:      customers,
-			// SelectionSize:  0.5,
-			// NumCPUs:   1,
-		})
-		if err != nil {
-			panic(err)
-		}
-
-		slvr.PostIterationCallback = func(best *solver.Agent) {
-			fmt.Printf("Best fitness: (dist:%.3f od:%.3f)\n", best.Fitness.Distance, best.Fitness.OverDemand)
-			gui.Draw(depots, customers, best)
-		}
-
-		slvr.Solve(solver.EndCondition{
-			Distance: 0,
-		})
-
-		// time.Sleep(time.Millisecond * 1000)
-		break
+		RandomChanceRouteSplit:              20,
+		RandomChanceDepotRelocation:         50,
+		RandomChanceEvaluateOuterDepotRoute: 100000,
+	})
+	if err != nil {
+		panic(err)
 	}
 
-	fmt.Println("Problems solved!")
-	gui.Stop()
+	slvr.PostIterationCallback = func(info solver.GenerationInfo) {
+		fmt.Printf("%s (generation %d)\n", path, info.GenerationNumber)
+		fmt.Printf("\tBest error:  %v\n", info.BestAgent.Fitness)
+		fmt.Printf("\tTotal error: %v\n\n", info.PopulationFitness)
+		gui.Draw(depots, customers, info.BestAgent)
+	}
+
+	_ = slvr.Solve(solver.EndCondition{})
 }
