@@ -9,61 +9,52 @@ import (
 	"github.com/jorgenhanssen/go-genetic-mdvrp/src/entities"
 )
 
-type Fitness struct {
-	Total      float64
-	Distance   float64
-	OverDemand float64
-}
-
-func (f *Fitness) CalculateTotal() {
-	f.Total = f.Distance
-	f.Total += 100 * math.Pow(f.OverDemand, 2)
-}
-
-func (f *Fitness) Add(f2 *Fitness) {
-	f.Distance += f2.Distance
-	f.OverDemand += f2.OverDemand
-	f.CalculateTotal()
-}
-
-func (f Fitness) String() string {
-	return fmt.Sprintf("Fitness(dist: %f, over-demand: %f, total: %f)", f.Distance, f.OverDemand, f.Total)
-}
-
+// Agent is a solution descrption to the problem.
+// It contains a DNA (direct route description) and
+// a fitness score.
 type Agent struct {
 	Dna     DNA
 	Fitness Fitness
 }
 
-func NewAgent(depots entities.Depots, customers entities.Customers) *Agent {
+// NewAgent creates a new random agent and evaluates the agent.
+func NewAgent(s *Solver) *Agent {
 	agent := &Agent{
-		Dna: NewDNA(depots, customers),
+		Dna: NewDNA(s.Depots, s.Customers),
 	}
 
-	agent.Evaluate(depots, customers)
+	agent.Evaluate(s.Depots, s.Customers)
 
 	return agent
 }
 
+// Evaluate evaluates the fitness of the agent.
+// The fitness is stored in the agent as a property.
 func (agent *Agent) Evaluate(depots entities.Depots, customers entities.Customers) {
-	agent.Fitness.Distance = 0
-	agent.Fitness.OverDemand = 0
+	agent.Fitness.Clear()
+
 	for _, route := range agent.Dna {
 		if len(route.Path) == 0 {
 			continue
 		}
 
+		// Add depot -> c_1 and depot -> c_n
 		agent.Fitness.Distance += distance(depots[route.DepotID], customers[route.Path[0]])
 		agent.Fitness.Distance += distance(depots[route.DepotID], customers[route.Path[len(route.Path)-1]])
+
+		// Add c_1 -> c_2, c_2 -> c_3, ... , c_n-1 -> c_n.
 		for i := 0; i < len(route.Path)-1; i++ {
 			agent.Fitness.Distance += distance(customers[route.Path[i]], customers[route.Path[i+1]])
 		}
 
+		// Accumulate all demand for the route.
 		demand := 0.0
 		for _, cID := range route.Path {
 			demand += customers[cID].Demand
 		}
 
+		// Add the positive difference between the max load and demand.
+		// If there is no positive difference the over-demand is 0.
 		agent.Fitness.OverDemand += math.Max(demand-depots[route.DepotID].MaxVehicleLoad, 0)
 	}
 
@@ -91,6 +82,9 @@ func (a *Agent) Copy() (child *Agent) {
 	return
 }
 
+// InjectRoute injects a route into its best placement.
+// The injected route is decomposed and fitted into the existing
+// routes so that the best overall per-new-customer is achieved.
 func (agent *Agent) InjectRoute(injectedRoute *Route, s *Solver) {
 	agent.Dna.RemoveRouteNodes(injectedRoute)
 
@@ -101,6 +95,12 @@ func (agent *Agent) InjectRoute(injectedRoute *Route, s *Solver) {
 
 		for _, route := range agent.Dna {
 			if route.DepotID != injectedRoute.DepotID && rand.Intn(s.RandomChanceEvaluateOuterDepotRoute) != 0 {
+				// In most cases, we do not bother checking routes that
+				// do not belong to the injected route's depot.
+				// i.e: each route is (often) closest to the depot it is connected to.
+				// therefore, we should skip evaluating other routes "far away".
+				// That being said, in some cases, this is not the cases.
+				// Which is why we have a small chance of checking outer depot routes.
 				continue
 			}
 			for i := 0; i < len(route.Path); i++ {
@@ -125,6 +125,11 @@ func (agent *Agent) InjectRoute(injectedRoute *Route, s *Solver) {
 	}
 }
 
+// RandomMutation runs a mutation procedure on the agent.
+// This allows chances for the following mutations:
+// - splitting a route in two
+// - re-locating a route's depot
+// all mutations follow constraints.
 func (agent *Agent) RandomMutation(s *Solver) {
 	// FIXME: hardcoded chance
 	for _, route := range agent.Dna {
@@ -150,8 +155,8 @@ func (agent *Agent) RandomMutation(s *Solver) {
 			hasBeenSplit = true
 		}
 
-		// We want to relocate a split route's closest depot
-		// 1/100 chance of re-locating closest depot
+		// If we have split the path, we want to ensure that this path
+		// is connected to its closest depot (if available).
 		if hasBeenSplit || rand.Intn(s.RandomChanceDepotRelocation) == 1 {
 			m := map[int]float64{}
 			for i, depot := range s.Depots {
@@ -166,7 +171,7 @@ func (agent *Agent) RandomMutation(s *Solver) {
 
 			for len(m) > 0 {
 				lowestVal := 9999999999.0
-				lowestKey := -1
+				lowestKey := 0
 				for k, v := range m {
 					if v < lowestVal {
 						lowestKey = k
@@ -183,6 +188,8 @@ func (agent *Agent) RandomMutation(s *Solver) {
 	}
 }
 
+// depotIsAvailable checks if the provided depot id
+// has available routes.
 func (agent *Agent) depotIsAvailable(s *Solver, id int) bool {
 	max := s.Depots[id].MaxNumVehicles
 
@@ -199,6 +206,9 @@ func (agent *Agent) depotIsAvailable(s *Solver, id int) bool {
 	return true
 }
 
+// availableDepot returns an arbitrary depot that can be given
+// more routes. If there is no available depots, an error will
+// be returned.
 func (agent *Agent) availableDepot(s *Solver, biasID int) (int, error) {
 	if agent.depotIsAvailable(s, biasID) {
 		return biasID, nil
@@ -212,15 +222,11 @@ func (agent *Agent) availableDepot(s *Solver, biasID int) (int, error) {
 	return 0, fmt.Errorf("No available depots")
 }
 
+// Agents is a collection of agents.
 type Agents []*Agent
 
-type Selector string
-
-const (
-	Roulette Selector = "Roulette"
-	Random   Selector = "Random"
-)
-
+// SelectOne selects an agent from the collection
+// using the provided selector as the selection method.
 func (agents Agents) SelectOne(method Selector) (int, *Agent) {
 	switch method {
 	case Roulette:
@@ -247,11 +253,4 @@ func (agents Agents) SelectOne(method Selector) (int, *Agent) {
 
 	index := rand.Intn(len(agents))
 	return index, agents[index]
-}
-
-// TODO: MOVE OUT
-func distance(a, b entities.Location) float64 {
-	ax, ay := a.GetPosition()
-	bx, by := b.GetPosition()
-	return math.Sqrt(math.Pow(ax-bx, 2) + math.Pow(ay-by, 2))
 }

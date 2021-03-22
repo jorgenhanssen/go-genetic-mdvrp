@@ -9,6 +9,8 @@ import (
 	"github.com/jorgenhanssen/go-genetic-mdvrp/src/entities"
 )
 
+// LoadProblem reads and loads depots and customers related
+// to a problem found in a file in the specified filePath.
 func LoadProblem(filePath string) (depots entities.Depots, customers entities.Customers, err error) {
 	depots = make(entities.Depots)
 	customers = make(entities.Customers)
@@ -51,7 +53,6 @@ func LoadProblem(filePath string) (depots entities.Depots, customers entities.Cu
 				return
 			}
 			customers[customer.ID] = &customer
-			// customers = append(customers, &customer)
 			continue
 		}
 
@@ -63,7 +64,6 @@ func LoadProblem(filePath string) (depots entities.Depots, customers entities.Cu
 				return
 			}
 			depots[len(depots)] = depot
-			// depots = append(depots, depot)
 			continue
 		}
 

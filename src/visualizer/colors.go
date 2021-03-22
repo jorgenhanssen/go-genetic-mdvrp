@@ -6,6 +6,8 @@ import (
 	"gopkg.in/go-playground/colors.v1"
 )
 
+// scalarToColor converts a float value between 0 and 1 to
+// a color following the long rainbow spectrum.
 func scalarToColor(value float64) (colors.Color, error) {
 	var a = (1 - value) / 0.2
 	var X = math.Floor(a)

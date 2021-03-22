@@ -7,8 +7,11 @@ import (
 	"github.com/jorgenhanssen/go-genetic-mdvrp/src/entities"
 )
 
+// DNA describes a solution.
 type DNA []*Route
 
+// NewDNA creates a new random DNA where a depot's routes
+// consist of customers closest to the depot.
 func NewDNA(depots entities.Depots, customers entities.Customers) (dna DNA) {
 	depotCustomers := make(map[int]entities.Customers)
 	for depotID := range depots {
@@ -46,6 +49,7 @@ func NewDNA(depots entities.Depots, customers entities.Customers) (dna DNA) {
 	return
 }
 
+// String returns a print-friendly description of the dna.
 func (dna DNA) String() string {
 	text := ""
 	for _, route := range dna {
@@ -54,10 +58,13 @@ func (dna DNA) String() string {
 	return text
 }
 
+// GetRandomRoute returns a random route in the dna.
 func (dna DNA) GetRandomRoute() *Route {
 	return dna[rand.Int63n(int64(len(dna)))]
 }
 
+// RemoveRouteNodes removes all customers from the dna that
+// is also found in the provided route.
 func (dna DNA) RemoveRouteNodes(route *Route) {
 	for _, cID := range route.Path {
 		for _, _route := range dna {
@@ -76,11 +83,14 @@ func (dna DNA) RemoveRouteNodes(route *Route) {
 	}
 }
 
+//  Route is a route that connects customers.
+// This is the path vehicles will travel.
 type Route struct {
 	DepotID int
 	Path    []int
 }
 
+// GetRandomRoute returns a random route in the route.
 func (route Route) String() string {
 	text := ""
 

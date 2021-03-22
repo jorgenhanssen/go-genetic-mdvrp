@@ -8,16 +8,14 @@ import (
 	"github.com/jorgenhanssen/go-genetic-mdvrp/src/threading"
 )
 
+// NOTE: NOT IN USE
+// EndCondition specifies the end-condition for the solver.
+// The solver stops when the conditions defined are met.
 type EndCondition struct {
 	Distance float64
 }
 
-type GenerationInfo struct {
-	BestAgent         *Agent
-	GenerationNumber  int
-	PopulationFitness Fitness
-}
-
+// SolverConfig is the solver's config.
 type SolverConfig struct {
 	Depots          entities.Depots
 	Customers       entities.Customers
@@ -31,6 +29,8 @@ type SolverConfig struct {
 	RandomChanceEvaluateOuterDepotRoute int
 }
 
+// ValidateAndSetDefaults validates the configuration and sets
+// default values where none are provided.
 func (cfg *SolverConfig) ValidateAndSetDefaults() error {
 	if len(cfg.Depots) == 0 {
 		return fmt.Errorf("No depots provided")
@@ -65,6 +65,7 @@ func (cfg *SolverConfig) ValidateAndSetDefaults() error {
 	return nil
 }
 
+// Solver solves the problem.
 type Solver struct {
 	SolverConfig
 	threads *threading.Instance
@@ -75,6 +76,7 @@ type Solver struct {
 	PostIterationCallback func(info GenerationInfo)
 }
 
+// NewSolver creates a new solver.
 func NewSolver(cfg SolverConfig) (*Solver, error) {
 	if err := cfg.ValidateAndSetDefaults(); err != nil {
 		return nil, err
@@ -88,6 +90,8 @@ func NewSolver(cfg SolverConfig) (*Solver, error) {
 
 }
 
+// Solve runs the solver and returns a stop-function
+// for external abortion of the process.
 func (s *Solver) Solve(endCondition EndCondition) func() {
 	abort := make(chan bool)
 	go s.solve(endCondition, abort)
@@ -134,6 +138,9 @@ func (s *Solver) solve(endCondition EndCondition, abort chan bool) {
 
 }
 
+// mate is a function for creating an offspring from two
+// parents. the function also runs the random mutation
+// procedure for the child.
 func (s *Solver) mate(a, b *Agent) (child *Agent) {
 	route := b.Dna.GetRandomRoute()
 
@@ -146,11 +153,12 @@ func (s *Solver) mate(a, b *Agent) (child *Agent) {
 	return
 }
 
+// initializeAgents creates the initial population.
 func (s *Solver) initializeAgents() {
 	s.threads.Run(func(tid int) error {
 		agents := Agents{}
 		for i := 0; i < s.PopulationSize/s.NumCPUs; i++ {
-			agents = append(agents, NewAgent(s.Depots, s.Customers))
+			agents = append(agents, NewAgent(s))
 		}
 
 		s.threads.Lock()
@@ -161,6 +169,9 @@ func (s *Solver) initializeAgents() {
 	})
 }
 
+// inIterationEnd is called on iteration end and
+// cleans up the generation and runs
+// external metric functions.
 func (s *Solver) onIterationEnd() {
 	info := GenerationInfo{
 		BestAgent:        s.agents[0],

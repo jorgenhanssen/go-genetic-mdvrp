@@ -12,6 +12,8 @@ import (
 	"github.com/jorgenhanssen/go-genetic-mdvrp/src/solver"
 )
 
+// The visualizer instance constains logic for illustrating a
+// MDVRP graph. The instance is tightly coupled with the solver.
 type Instance struct {
 	window *sdlcanvas.Window
 	canvas *canvas.Canvas
@@ -21,7 +23,7 @@ type Instance struct {
 	bestAgent *solver.Agent
 
 	// bounding box for nodes
-	// X = max X, x = min x
+	// large X = max x, small x = min x etc...
 	X, x, Y, y float64
 
 	mu sync.Mutex
@@ -61,6 +63,7 @@ func (i *Instance) Draw(depots entities.Depots, customers entities.Customers, be
 
 	X, x, Y, y := getBoundary(locations)
 
+	// Apply 20px padding to all sides.
 	i.X = X + 20
 	i.x = x - 20
 	i.Y = Y + 20
