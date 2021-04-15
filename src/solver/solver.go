@@ -40,7 +40,7 @@ func (cfg *SolverConfig) ValidateAndSetDefaults() error {
 	}
 
 	if cfg.PopulationSize == 0 {
-		cfg.SelectionSize = 200
+		cfg.PopulationSize = 200
 	}
 	if cfg.NumCPUs == 0 {
 		cfg.NumCPUs = runtime.NumCPU()
