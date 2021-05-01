@@ -109,8 +109,8 @@ func (s *Solver) solve(endCondition EndCondition, abort chan bool) {
 
 		s.threads.Run(func(tid int) error {
 			for i := tid; i < numNewAgents; i += s.threads.NumThreads {
-				p1i, p1 := s.agents.SelectOne(Roulette)
-				p2i, p2 := s.agents.SelectOne(Roulette)
+				p1i, p1 := s.agents.SelectOne(s.SelectionMethod)
+				p2i, p2 := s.agents.SelectOne(s.SelectionMethod)
 
 				c1 := s.mate(p1, p2)
 				if c1.Fitness.Total < p1.Fitness.Total {
